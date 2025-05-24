@@ -1,91 +1,111 @@
 package ui;
 
 import model.Car;
-import model.Customer;
-import model.Rental;
-import service.CarRentalSystem;
+import service.DatabaseHelper;
 
 import javax.swing.*;
+import javax.swing.border.EmptyBorder;
 import java.awt.*;
+import java.io.FileNotFoundException;
+import java.io.PrintWriter;
+import java.sql.*;
+import java.util.ArrayList;
 import java.util.List;
 
 public class CarRentalGUI extends JFrame {
-    private CarRentalSystem rentalSystem;
+    private JTextArea slipArea;
 
     public CarRentalGUI() {
-        rentalSystem = new CarRentalSystem();
-
-        // Add some initial cars
-        rentalSystem.addCar(new Car("01", "Toyota", "Fortuner", 2000.0));
-        rentalSystem.addCar(new Car("02", "Mahindra", "Scorpio", 1600.0));
-        rentalSystem.addCar(new Car("03", "Mahindra", "Thar", 1500.0));
-        rentalSystem.addCar(new Car("04", "Mahindra", "Scorpio N", 1800.0));
-
         setTitle("Car Rental System");
-        setSize(450, 350);
+        setSize(700, 500);
         setDefaultCloseOperation(EXIT_ON_CLOSE);
+        setLayout(new BorderLayout(15, 15));
 
-        // Use BoxLayout vertical
-        JPanel panel = new JPanel();
-        panel.setBorder(BorderFactory.createEmptyBorder(30, 30, 30, 30));
-        panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
-        panel.setBackground(new Color(240, 248, 255));  // light blue
+        // Global font settings
+        UIManager.put("Label.font", new Font("Segoe UI", Font.PLAIN, 16));
+        UIManager.put("Button.font", new Font("Segoe UI", Font.BOLD, 16));
+        UIManager.put("TextField.font", new Font("Segoe UI", Font.PLAIN, 16));
+        UIManager.put("OptionPane.messageFont", new Font("Segoe UI", Font.PLAIN, 16));
 
-        Font buttonFont = new Font("Segoe UI", Font.BOLD, 16);
+        JPanel buttonPanel = new JPanel(new GridLayout(1, 4, 10, 10));
+        buttonPanel.setBackground(Color.decode("#f0f0f0"));
+        buttonPanel.setBorder(new EmptyBorder(10, 10, 10, 10));
 
-        JButton rentButton = new JButton("Rent a Car");
-        JButton returnButton = new JButton("Return a Car");
-        JButton viewButton = new JButton("View Available Cars");
-        JButton exitButton = new JButton("Exit");
+        JButton rentButton = createStyledButton(" Rent");
+        JButton returnButton = createStyledButton("Return");
+        JButton viewButton = createStyledButton("View Cars");
+        JButton exitButton = createStyledButton("Exit");
 
-        rentButton.setAlignmentX(Component.CENTER_ALIGNMENT);
-        rentButton.setFont(buttonFont);
-        rentButton.setBackground(new Color(70, 130, 180)); // steel blue
-        rentButton.setForeground(Color.WHITE);
-        rentButton.setFocusPainted(false);
+        buttonPanel.add(rentButton);
+        buttonPanel.add(returnButton);
+        buttonPanel.add(viewButton);
+        buttonPanel.add(exitButton);
 
-        returnButton.setAlignmentX(Component.CENTER_ALIGNMENT);
-        returnButton.setFont(buttonFont);
-        returnButton.setBackground(new Color(70, 130, 180));
-        returnButton.setForeground(Color.WHITE);
-        returnButton.setFocusPainted(false);
+        JPanel centerPanel = new JPanel(new BorderLayout());
+        centerPanel.setBorder(new EmptyBorder(10, 20, 20, 20));
+        centerPanel.setBackground(Color.decode("#ffffff"));
 
-        viewButton.setAlignmentX(Component.CENTER_ALIGNMENT);
-        viewButton.setFont(buttonFont);
-        viewButton.setBackground(new Color(70, 130, 180));
-        viewButton.setForeground(Color.WHITE);
-        viewButton.setFocusPainted(false);
+        slipArea = new JTextArea();
+        slipArea.setEditable(false);
+        slipArea.setFont(new Font("Consolas", Font.PLAIN, 14));
+        slipArea.setMargin(new Insets(10, 10, 10, 10));
+        slipArea.setBackground(Color.decode("#fdfdfd"));
+        slipArea.setBorder(BorderFactory.createLineBorder(Color.LIGHT_GRAY, 1));
 
-        exitButton.setAlignmentX(Component.CENTER_ALIGNMENT);
-        exitButton.setFont(buttonFont);
-        exitButton.setBackground(new Color(220, 20, 60)); // crimson red
-        exitButton.setForeground(Color.WHITE);
-        exitButton.setFocusPainted(false);
+        JScrollPane scrollPane = new JScrollPane(slipArea);
+        scrollPane.setBorder(BorderFactory.createTitledBorder(" Rental Slip"));
 
-        panel.add(rentButton);
-        panel.add(Box.createRigidArea(new Dimension(0, 20)));
-        panel.add(returnButton);
-        panel.add(Box.createRigidArea(new Dimension(0, 20)));
-        panel.add(viewButton);
-        panel.add(Box.createRigidArea(new Dimension(0, 20)));
-        panel.add(exitButton);
-
-        add(panel);
+        add(buttonPanel, BorderLayout.NORTH);
+        centerPanel.add(scrollPane, BorderLayout.CENTER);
+        add(centerPanel, BorderLayout.CENTER);
 
         rentButton.addActionListener(e -> rentCar());
         returnButton.addActionListener(e -> returnCar());
         viewButton.addActionListener(e -> viewAvailableCars());
         exitButton.addActionListener(e -> System.exit(0));
 
+        getContentPane().setBackground(Color.decode("#e8ecf0"));
         setLocationRelativeTo(null);
         setVisible(true);
     }
 
-    private void rentCar() {
-        String name = JOptionPane.showInputDialog(this, "Enter your name:");
-        if (name == null || name.trim().isEmpty()) return;
+    private JButton createStyledButton(String text) {
+        JButton button = new JButton(text);
+        button.setFocusPainted(false);
+        button.setBackground(new Color(0x2D89EF));
+        button.setForeground(Color.WHITE);
+        button.setBorder(BorderFactory.createLineBorder(new Color(0x1E5BA2)));
+        button.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        button.setOpaque(true);
+        return button;
+    }
 
-        List<Car> availableCars = rentalSystem.getAvailableCars();
+    private List<Car> loadAvailableCars() {
+        List<Car> cars = new ArrayList<>();
+        try (Connection conn = DatabaseHelper.getConnection();
+             Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery("SELECT * FROM cars WHERE is_rented = false")) {
+            while (rs.next()) {
+                cars.add(new Car(
+                        rs.getString("car_id"),
+                        rs.getString("brand"),
+                        rs.getString("model"),
+                        rs.getDouble("price_per_day"),
+                        rs.getBoolean("is_rented")
+                ));
+            }
+        } catch (SQLException ex) {
+            ex.printStackTrace();
+            JOptionPane.showMessageDialog(this, "Failed to load cars from database.");
+        }
+        return cars;
+    }
+
+    private void rentCar() {
+        String customerName = JOptionPane.showInputDialog(this, "Enter your name:");
+        if (customerName == null || customerName.trim().isEmpty()) return;
+
+        List<Car> availableCars = loadAvailableCars();
         if (availableCars.isEmpty()) {
             JOptionPane.showMessageDialog(this, "No cars available for rent.");
             return;
@@ -95,15 +115,19 @@ public class CarRentalGUI extends JFrame {
                 .map(c -> c.getCarId() + ": " + c.getBrand() + " " + c.getModel())
                 .toArray(String[]::new);
 
-        String selected = (String) JOptionPane.showInputDialog(this,
-                "Select a car to rent:", "Available Cars",
+        String selected = (String) JOptionPane.showInputDialog(this, "Select a car to rent:", "Cars",
                 JOptionPane.QUESTION_MESSAGE, null, carOptions, carOptions[0]);
-
         if (selected == null) return;
 
         String carId = selected.split(":")[0];
-        Car car = rentalSystem.findCarById(carId);
-        if (car == null) return;
+        Car selectedCar = null;
+        for (Car car : availableCars) {
+            if (car.getCarId().equals(carId)) {
+                selectedCar = car;
+                break;
+            }
+        }
+        if (selectedCar == null) return;
 
         String daysStr = JOptionPane.showInputDialog(this, "Enter number of rental days:");
         int days;
@@ -115,100 +139,133 @@ public class CarRentalGUI extends JFrame {
             return;
         }
 
-        Customer customer = new Customer("CUS" + (rentalSystem.getCustomers().size() + 1), name);
-        rentalSystem.addCustomer(customer);
+        try (Connection conn = DatabaseHelper.getConnection()) {
+            conn.setAutoCommit(false);
 
-        double price = car.calculatePrice(days);
-        int confirm = JOptionPane.showConfirmDialog(this,
-                String.format("Total Price: R%.2f. Confirm rental?", price),
-                "Confirm Rental", JOptionPane.YES_NO_OPTION);
+            String customerId = "C" + System.currentTimeMillis();
+            PreparedStatement custStmt = conn.prepareStatement("INSERT INTO customers VALUES (?, ?)");
+            custStmt.setString(1, customerId);
+            custStmt.setString(2, customerName);
+            custStmt.executeUpdate();
 
-        if (confirm == JOptionPane.YES_OPTION) {
-            rentalSystem.rentCar(car, customer, days);
+            PreparedStatement carStmt = conn.prepareStatement("UPDATE cars SET is_rented = true WHERE car_id = ?");
+            carStmt.setString(1, selectedCar.getCarId());
+            carStmt.executeUpdate();
+
+            PreparedStatement rentalStmt = conn.prepareStatement("INSERT INTO rentals (car_id, customer_id, days) VALUES (?, ?, ?)");
+            rentalStmt.setString(1, selectedCar.getCarId());
+            rentalStmt.setString(2, customerId);
+            rentalStmt.setInt(3, days);
+            rentalStmt.executeUpdate();
+
+            conn.commit();
+
+            double total = days * selectedCar.getPricePerDay();
+
+            slipArea.setText("====== Rental Slip ======\n");
+            slipArea.append("Customer: " + customerName + "\n");
+            slipArea.append("Car: " + selectedCar.getBrand() + " " + selectedCar.getModel() + "\n");
+            slipArea.append("Days: " + days + "\n");
+            slipArea.append("Price/Day: ₹" + selectedCar.getPricePerDay() + "\n");
+            slipArea.append("-------------------------\n");
+            slipArea.append("Total: ₹" + total + "\n");
+            slipArea.append("========================\n");
+
+            try (PrintWriter writer = new PrintWriter("rental_slip.txt")) {
+                writer.write(slipArea.getText());
+            } catch (FileNotFoundException e) {
+                e.printStackTrace();
+                JOptionPane.showMessageDialog(this, "Failed to save rental slip.");
+            }
+
             JOptionPane.showMessageDialog(this, "Car rented successfully.");
-
-            // Show rental slip
-            showRentalSlip(customer, car, days, price);
+        } catch (SQLException ex) {
+            ex.printStackTrace();
+            JOptionPane.showMessageDialog(this, "Rental failed. See console.");
         }
     }
 
-    private void showRentalSlip(Customer customer, Car car, int days, double price) {
-        StringBuilder slip = new StringBuilder();
-        slip.append("===== Rental Slip =====\n\n");
-        slip.append("Customer Name: ").append(customer.getName()).append("\n");
-        slip.append("Car: ").append(car.getBrand()).append(" ").append(car.getModel()).append("\n");
-        slip.append("Rental Days: ").append(days).append("\n");
-        slip.append(String.format("Total Price: R%.2f\n", price));
-        slip.append("\nThank you for renting with us!");
-
-        JTextArea slipArea = new JTextArea(slip.toString());
-        slipArea.setFont(new Font("Consolas", Font.PLAIN, 14));
-        slipArea.setEditable(false);
-        slipArea.setBackground(new Color(250, 250, 250));
-        slipArea.setBorder(BorderFactory.createEmptyBorder(15, 15, 15, 15));
-
-        JScrollPane scrollPane = new JScrollPane(slipArea);
-        scrollPane.setPreferredSize(new Dimension(350, 200));
-
-        JOptionPane.showMessageDialog(this, scrollPane, "Rental Slip", JOptionPane.INFORMATION_MESSAGE);
-    }
-
     private void returnCar() {
-        List<Rental> rentals = rentalSystem.getRentals();
-        if (rentals.isEmpty()) {
+        List<Car> rentedCars = new ArrayList<>();
+        try (Connection conn = DatabaseHelper.getConnection();
+             Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery("SELECT * FROM cars WHERE is_rented = true")) {
+            while (rs.next()) {
+                rentedCars.add(new Car(
+                        rs.getString("car_id"),
+                        rs.getString("brand"),
+                        rs.getString("model"),
+                        rs.getDouble("price_per_day"),
+                        rs.getBoolean("is_rented")
+                ));
+            }
+        } catch (SQLException ex) {
+            ex.printStackTrace();
+            JOptionPane.showMessageDialog(this, "Failed to load rented cars.");
+            return;
+        }
+
+        if (rentedCars.isEmpty()) {
             JOptionPane.showMessageDialog(this, "No cars are currently rented.");
             return;
         }
 
-        String[] rentedCars = rentals.stream()
-                .map(r -> r.getCar().getCarId() + ": " + r.getCar().getBrand() + " " + r.getCar().getModel())
+        String[] rentedOptions = rentedCars.stream()
+                .map(c -> c.getCarId() + ": " + c.getBrand() + " " + c.getModel())
                 .toArray(String[]::new);
 
-        String selected = (String) JOptionPane.showInputDialog(this,
-                "Select a car to return:", "Return Car",
-                JOptionPane.QUESTION_MESSAGE, null, rentedCars, rentedCars[0]);
-
+        String selected = (String) JOptionPane.showInputDialog(this, "Select a car to return:", "Return Car",
+                JOptionPane.QUESTION_MESSAGE, null, rentedOptions, rentedOptions[0]);
         if (selected == null) return;
 
         String carId = selected.split(":")[0];
-        Car car = rentalSystem.findCarById(carId);
-        if (car != null) {
-            rentalSystem.returnCar(car);
-            JOptionPane.showMessageDialog(this, "Car returned successfully.");
+        Car returnCar = null;
+        for (Car car : rentedCars) {
+            if (car.getCarId().equals(carId)) {
+                returnCar = car;
+                break;
+            }
+        }
+        if (returnCar == null) return;
+
+        try (Connection conn = DatabaseHelper.getConnection()) {
+            PreparedStatement stmt = conn.prepareStatement("UPDATE cars SET is_rented = false WHERE car_id = ?");
+            stmt.setString(1, returnCar.getCarId());
+            int updated = stmt.executeUpdate();
+
+            if (updated > 0) {
+                PreparedStatement deleteRental = conn.prepareStatement("DELETE FROM rentals WHERE car_id = ?");
+                deleteRental.setString(1, returnCar.getCarId());
+                deleteRental.executeUpdate();
+
+                JOptionPane.showMessageDialog(this, "Car returned successfully.");
+            } else {
+                JOptionPane.showMessageDialog(this, "Car return failed.");
+            }
+        } catch (SQLException ex) {
+            ex.printStackTrace();
+            JOptionPane.showMessageDialog(this, "Return failed. See console.");
         }
     }
 
     private void viewAvailableCars() {
-        List<Car> availableCars = rentalSystem.getAvailableCars();
+        List<Car> availableCars = loadAvailableCars();
+        StringBuilder sb = new StringBuilder("Available Cars:\n");
+
         if (availableCars.isEmpty()) {
-            JOptionPane.showMessageDialog(this, "No cars available.");
-            return;
+            sb.append("No cars available.");
+        } else {
+            for (Car car : availableCars) {
+                sb.append(car.getCarId()).append(" - ")
+                        .append(car.getBrand()).append(" ").append(car.getModel())
+                        .append(" (₹").append(car.getPricePerDay()).append("/day)\n");
+            }
         }
 
-        StringBuilder sb = new StringBuilder("Available Cars:\n\n");
-        for (Car car : availableCars) {
-            sb.append(car.getCarId())
-                    .append(" - ")
-                    .append(car.getBrand())
-                    .append(" ")
-                    .append(car.getModel())
-                    .append(" (R").append(car.getPricePerDay()).append("/day)\n");
-        }
-
-        JTextArea textArea = new JTextArea(sb.toString());
-        textArea.setFont(new Font("Segoe UI", Font.PLAIN, 14));
-        textArea.setEditable(false);
-        textArea.setBackground(new Color(245, 245, 245));
-        textArea.setBorder(BorderFactory.createEmptyBorder(15, 15, 15, 15));
-
-        JScrollPane scrollPane = new JScrollPane(textArea);
-        scrollPane.setPreferredSize(new Dimension(350, 250));
-
-        JOptionPane.showMessageDialog(this, scrollPane, "Available Cars", JOptionPane.INFORMATION_MESSAGE);
+        JOptionPane.showMessageDialog(this, sb.toString());
     }
 
     public static void main(String[] args) {
         SwingUtilities.invokeLater(CarRentalGUI::new);
     }
 }
-

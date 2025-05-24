@@ -6,7 +6,6 @@ import model.Rental;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.UUID;
 import java.util.stream.Collectors;
 
 public class CarRentalSystem {
@@ -20,18 +19,29 @@ public class CarRentalSystem {
         rentals = new ArrayList<>();
     }
 
-    // Add initial cars
     public void addCar(Car car) {
         cars.add(car);
     }
 
     public List<Car> getAvailableCars() {
-        List<String> rentedCarIds = rentals.stream()
-                .map(r -> r.getCar().getCarId())
-                .toList();
         return cars.stream()
-                .filter(car -> !rentedCarIds.contains(car.getCarId()))
+                .filter(car -> !car.isRented())
                 .collect(Collectors.toList());
+    }
+
+    public Car findCarById(String carId) {
+        return cars.stream()
+                .filter(c -> c.getCarId().equals(carId))
+                .findFirst()
+                .orElse(null);
+    }
+
+    public List<Customer> getCustomers() {
+        return customers;
+    }
+
+    public List<Rental> getRentals() {
+        return rentals;
     }
 
     public void addCustomer(Customer customer) {
@@ -39,27 +49,13 @@ public class CarRentalSystem {
     }
 
     public void rentCar(Car car, Customer customer, int days) {
-        String rentalId = UUID.randomUUID().toString();
-        Rental rental = new Rental(rentalId, car, customer, days);
+        car.setRented(true);
+        Rental rental = new Rental(car, customer, days);
         rentals.add(rental);
     }
 
     public void returnCar(Car car) {
-        rentals.removeIf(r -> r.getCar().getCarId().equals(car.getCarId()));
-    }
-
-    public List<Rental> getRentals() {
-        return rentals;
-    }
-
-    public Car findCarById(String id) {
-        return cars.stream()
-                .filter(c -> c.getCarId().equals(id))
-                .findFirst()
-                .orElse(null);
-    }
-
-    public List<Customer> getCustomers() {
-        return customers;
+        car.setRented(false);
+        rentals.removeIf(rental -> rental.getCar().getCarId().equals(car.getCarId()));
     }
 }

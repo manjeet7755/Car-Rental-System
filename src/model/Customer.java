@@ -9,7 +9,12 @@ public class Customer {
         this.name = name;
     }
 
-    public String getCustomerId() { return customerId; }
-    public String getName() { return name; }
+    public String getCustomerId() {
+        return customerId;
+    }
+
+    public String getName() {
+        return name;
+    }
 }
 

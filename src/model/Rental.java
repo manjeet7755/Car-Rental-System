@@ -1,20 +1,25 @@
 package model;
 
 public class Rental {
-    private String rentalId;
     private Car car;
     private Customer customer;
-    private int days;
+    private int rentalDays;
 
-    public Rental(String rentalId, Car car, Customer customer, int days) {
-        this.rentalId = rentalId;
+    public Rental(Car car, Customer customer, int rentalDays) {
         this.car = car;
         this.customer = customer;
-        this.days = days;
+        this.rentalDays = rentalDays;
     }
 
-    public String getRentalId() { return rentalId; }
-    public Car getCar() { return car; }
-    public Customer getCustomer() { return customer; }
-    public int getDays() { return days; }
+    public Car getCar() {
+        return car;
+    }
+
+    public Customer getCustomer() {
+        return customer;
+    }
+
+    public int getRentalDays() {
+        return rentalDays;
+    }
 }
