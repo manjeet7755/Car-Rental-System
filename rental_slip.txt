@@ -1,0 +1,8 @@
+====== Rental Slip ======
+Customer: dccbh
+Car: Mahindra THAR
+Days: 5
+Price/Day: ₹1400.0
+-------------------------
+Total: ₹7000.0
+========================
